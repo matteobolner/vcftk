@@ -10,6 +10,7 @@ readme = "README.md"
 python = "^3.12"
 pandas = "^2.2.2"
 numpy = "^2.0.0"
+cyvcf2 = "^0.31.1"
 
 
 [build-system]
