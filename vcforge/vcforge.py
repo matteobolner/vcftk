@@ -18,7 +18,7 @@ class VCFClass:
         self.sample_info, self.vcf = self._setup_data(sample_info, vcf_path)
         self.vcf.set_threads(threads)
         self.samples = self.vcf.samples
-        if add_info == True:
+        if add_info is True:
             self.variants = get_vcf_metadata_and_info(VCF(vcf_path))
         else:
             self.variants = get_vcf_metadata(VCF(vcf_path))
@@ -55,8 +55,8 @@ class VCFClass:
         sample_info.set_index(self._sample_id_column, inplace=True)
         vcf = VCF(input_vcf)
         samples = [i for i in sample_info.index if i in vcf.samples]
-        sample_info = sample_info.loc[samples]
         vcf.set_samples(samples)
+        sample_info = sample_info.loc[vcf.samples]
         return sample_info, vcf
 
     def split_by_sample_column(
@@ -114,9 +114,53 @@ class VCFClass:
     def save_vcf(self, save_path, add_ids=False):
         w = Writer(save_path, self.vcf)
         for v, id in zip(self.vcf, self.var_ids):
-            if add_ids==True:
-                v.ID=id
+            if add_ids is True:
+                v.ID = id
             w.write_record(v)
         w.close()
         self.reset_vcf_iterator()
         print(f"VCF saved to {save_path}")
+
+    def get_var_stats(self, add_to_info=True):
+        var_stats = {
+            "NUM_CALLED": {},
+            "CALL_RATE": {},
+            "AA_FREQ": {},
+            "NUCL_DIVERSITY": {},
+            "VAR_TYPE": {},
+            "VAR_SUBTYPE": {},
+        }
+        for var, id in zip(self.vcf, self.var_ids):
+            var_stats["NUM_CALLED"][id] = var.num_called
+            var_stats["CALL_RATE"][id] = var.call_rate
+            var_stats["AA_FREQ"][id] = var.aaf
+            var_stats["NUCL_DIVERSITY"][id] = var.nucl_diversity
+            var_stats["VAR_TYPE"][id] = var.var_type
+            var_stats["VAR_SUBTYPE"][id] = var.var_subtype
+        var_stats = pd.DataFrame(var_stats)
+        if add_to_info is True:
+            self.variants = pd.concat([self.variants, var_stats], axis=1)
+        self.reset_vcf_iterator()
+        return var_stats
+
+    def show_genotypes(self):
+        genotypes=[]
+        for var in self.vcf:
+            genotypes.append([Genotype(i) for i in var.genotypes])
+            genotypes=pd.DataFrame(genotypes, index=self.var_ids, columns=self.samples)
+        self.reset_vcf_iterator()
+        return genotypes
+
+
+class Genotype(object):
+    __slots__ = ("alleles", "phased")
+
+    def __init__(self, li):
+        self.alleles = li[:-1]
+        self.phased = li[-1]
+
+    def __str__(self):
+        sep = "/|"[int(self.phased)]
+        return sep.join("0123."[a] for a in self.alleles)
+
+    __repr__ = __str__
