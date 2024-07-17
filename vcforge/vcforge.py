@@ -111,9 +111,11 @@ class VCFClass:
             add_info=False,
         )
 
-    def save_vcf(self, save_path):
+    def save_vcf(self, save_path, add_ids=False):
         w = Writer(save_path, self.vcf)
-        for v in self.vcf:
+        for v, id in zip(self.vcf, self.var_ids):
+            if add_ids==True:
+                v.ID=id
             w.write_record(v)
         w.close()
         self.reset_vcf_iterator()
