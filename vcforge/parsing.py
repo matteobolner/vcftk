@@ -68,16 +68,17 @@ def get_vcf_metadata_and_info(cyvcf):
 
 def get_var_format_from_vcf(cyvcf, format, allele):
     vars_format = []
-    ids = []
+    # ids = []
     for var in cyvcf:
-        ids.append(f"{var.CHROM}:{var.POS}")
+        # ids.append(f"{var.CHROM}:{var.POS}")
         try:
             var_format = var.format(format).transpose()[allele]
         except:
             var_format = np.full(len(cyvcf.samples), np.nan)
         vars_format.append(var_format)
-    return pd.DataFrame(vars_format, columns=cyvcf.samples)
-
+    var_format_df = pd.DataFrame(vars_format, columns=cyvcf.samples)
+    var_format_df = var_format_df.replace(-2147483648, np.nan)
+    return var_format_df
 
 def build_var_ID(df, alleles=False):
     if alleles == True:
