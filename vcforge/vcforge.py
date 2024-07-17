@@ -147,7 +147,7 @@ class VCFClass:
         genotypes=[]
         for var in self.vcf:
             genotypes.append([Genotype(i) for i in var.genotypes])
-            genotypes=pd.DataFrame(genotypes, index=self.var_ids, columns=self.samples)
+        genotypes=pd.DataFrame(genotypes, index=self.var_ids, columns=self.samples)
         self.reset_vcf_iterator()
         return genotypes
 
