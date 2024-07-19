@@ -111,12 +111,15 @@ class VCFClass:
             add_info=False,
         )
 
-    def save_vcf(self, save_path, add_ids=False):
+    def save_vcf(self, save_path, add_ids=False, vars_to_save=self.var_ids):
         w = Writer(save_path, self.vcf)
         for v, id in zip(self.vcf, self.var_ids):
-            if add_ids is True:
-                v.ID = id
-            w.write_record(v)
+            if id in vars_to_save:
+                if add_ids is True:
+                    v.ID = id
+                w.write_record(v)
+            else:
+                pass
         w.close()
         self.reset_vcf_iterator()
         print(f"VCF saved to {save_path}")
@@ -144,10 +147,10 @@ class VCFClass:
         return var_stats
 
     def show_genotypes(self):
-        genotypes=[]
+        genotypes = []
         for var in self.vcf:
             genotypes.append([Genotype(i) for i in var.genotypes])
-        genotypes=pd.DataFrame(genotypes, index=self.var_ids, columns=self.samples)
+        genotypes = pd.DataFrame(genotypes, index=self.var_ids, columns=self.samples)
         self.reset_vcf_iterator()
         return genotypes
 
