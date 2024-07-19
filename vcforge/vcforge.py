@@ -111,8 +111,9 @@ class VCFClass:
             add_info=False,
         )
 
-    def save_vcf(self, save_path, add_ids=False, vars_to_save=self.var_ids):
+    def save_vcf(self, save_path, add_ids=False, var_ids=None):
         w = Writer(save_path, self.vcf)
+        vars_to_save = var_ids if var_ids is not None else self.var_ids
         for v, id in zip(self.vcf, self.var_ids):
             if id in vars_to_save:
                 if add_ids is True:
