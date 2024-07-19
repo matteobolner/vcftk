@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "vcforge"
-version = "0.1.5"
+version = "0.1.5.1"
 description = "Python library for working with VCF files"
 authors = ["matteobolner <matteo.bolner2@unibo.it>"]
 license = "MIT"
