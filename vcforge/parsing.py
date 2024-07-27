@@ -1,7 +1,7 @@
 import pandas as pd
 import gzip
 import numpy as np
-from vcforge.utils import parse_table
+
 from cyvcf2 import VCF
 
 
@@ -14,7 +14,7 @@ def get_var_info_from_var(var):
 
 
 def get_var_metadata_from_var(var):
-    var_info = [
+    var_metadata = [
         var.CHROM,
         var.POS,
         var.ID,
@@ -24,46 +24,49 @@ def get_var_metadata_from_var(var):
         var.FILTER,
         ":".join(var.FORMAT),
     ]
-    return var_info
+    return var_metadata
 
 
-def get_vcf_metadata(cyvcf):
-    vars_metadata = []
-    for var in cyvcf:
-        vars_metadata.append(get_var_metadata_from_var(var))
-    vars_metadata = pd.DataFrame(
-        vars_metadata,
-        columns=["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "FORMAT"],
-    )
-    return vars_metadata
+def get_vcf_metadata(cyvcf, add_info=False):
+
+    columns = ["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "FORMAT"]
+    if add_info:
+        vars_metadata = []
+        vars_info = []
+        for var in cyvcf:
+            vars_metadata.append(get_var_metadata_from_var(var))
+            vars_info.append(get_var_info_from_var())
+        vars_info = pd.DataFrame(vars_info)
+        vars_metadata_df = pd.DataFrame(vars_metadata, columns=columns)
+        vars_metadata_df = pd.concat([vars_metadata_df, vars_info], axis=1)
+
+    else:
+        vars_metadata = [get_var_metadata_from_var(var) for var in cyvcf]
+        vars_metadata_df = pd.DataFrame(vars_metadata, columns=columns)
+
+    return vars_metadata_df
 
 
-def get_vcf_info_fields(cyvcf):
-    vars_info = []
-    for var in cyvcf:
-        vars_info.append(get_var_info_from_var(var))
-    return
-
-
-def get_vcf_metadata_and_info(cyvcf):
-    vars_info = []
-    vars_metadata = []
-    for var in cyvcf:
-        vars_metadata.append(get_var_metadata_from_var(var))
-        vars_info.append(get_var_info_from_var(var))
-    vars_info = pd.DataFrame(vars_info)
-    vars_metadata = pd.DataFrame(
-        vars_metadata,
-        columns=["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "FORMAT"],
-    )
-    if len(vars_metadata["ID"].unique()) == 1:
+def add_variant_ids(vars_metadata):
+    if vars_metadata["ID"].isna().all():
         if vars_metadata[["CHROM", "POS"]].duplicated().any():
-            vars_metadata["ID"] = build_var_ID(vars_metadata, alleles=True)
+            return build_var_ID(vars_metadata, alleles=True)
         else:
-            vars_metadata["ID"] = build_var_ID(vars_metadata, alleles=False)
-    df = pd.concat([vars_metadata, vars_info], axis=1)
-    df = df.set_index("ID")
-    return df
+            return build_var_ID(vars_metadata, alleles=False)
+    else:
+        return vars_metadata["ID"]
+
+
+def get_vcf_info(cyvcf, info_name):
+    vars_info = [var.INFO[info_name] for var in cyvcf]
+    vars_info = pd.Series(vars_info, name=info_name)
+    return vars_info
+
+
+def get_all_vcf_info(cyvcf):
+    vars_info = [get_var_info_from_var(var) for var in cyvcf]
+    vars_info = pd.DataFrame(vars_info)
+    return vars_info
 
 
 def get_var_format_from_vcf(cyvcf, format, allele):
@@ -89,7 +92,9 @@ def build_var_ID(df, alleles=False):
             + "_"
             + df["REF"]
             + "_"
-            + df["ALT"].str.join(",")
+            + df["ALT"].apply(
+                lambda x: ",".join(x) if isinstance(x, list) else x
+            )
         )
     else:
         ids = df["CHROM"].astype(str) + ":" + df["POS"].astype(str)

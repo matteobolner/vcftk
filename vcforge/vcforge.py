@@ -11,6 +11,7 @@ class VCFClass:
         vcf_path=None,
         sample_info=None,
         add_info=False,
+        create_ids_if_none=True,
         threads=1,
     ):
         self._vcf_path = vcf_path
@@ -18,10 +19,10 @@ class VCFClass:
         self.sample_info, self.vcf = self._setup_data(sample_info, vcf_path)
         self.vcf.set_threads(threads)
         self.samples = self.vcf.samples
-        if add_info is True:
-            self.variants = get_vcf_metadata_and_info(VCF(vcf_path))
-        else:
-            self.variants = get_vcf_metadata(VCF(vcf_path))
+        self.variants = get_vcf_metadata(VCF(vcf_path), add_info=add_info)
+        if create_ids_if_none:
+            self.variants["ID"] = add_variant_ids(self.variants)
+        self.variants = self.variants.set_index("ID")
         self.var_ids = list(self.variants.index)
         print(
             f"VCF contains {len(self.variants)} variants over {len(self.samples)} samples"
@@ -59,9 +60,7 @@ class VCFClass:
         sample_info = sample_info.loc[vcf.samples]
         return sample_info, vcf
 
-    def split_by_sample_column(
-        self, column: list, add_info: bool = False
-    ) -> Dict[str, "VCF"]:
+    def split_by_sample_column(self, column: list) -> Dict[str, "VCF"]:
         """
         Split the dataset (data and sample metadata) in multiple independent VCF instances
         based on the values of one or more sample metadata columns.
@@ -87,10 +86,32 @@ class VCFClass:
                 sample_id_column=self._sample_id_column,
                 vcf_path=self._vcf_path,
                 sample_info=group,
-                add_info=add_info,
             )
             split_data[name] = tempclass
         return split_data
+
+    def subset_samples(self, sample_list):
+        subsetted_samples = samples.loc[sample_list]
+        subsetted = VCFClass(
+            sample_id_column=self._sample_id_column,
+            vcf_path=self._vcf_path,
+            sample_info=subsetted_samples,
+        )
+        return subsetted
+
+    # TODO: find a way to subset variants, cyvcf apparently cant do it
+    """
+    def subset_variants(self, variant_list):
+        subsetted_variants=self.variants.loc[variant_list]
+        subsetted = VCFClass(
+            sample_id_column=self._sample_id_column,
+            vcf_path=self._vcf_path,
+            sample_info=self.sample_info,
+        )
+        subsetted.var_ids=variant_list
+        subsetted.variants=subsetted.variants.loc[variant_ids]
+        return subsetted
+    """
 
     def reset_vcf_iterator(self):
         self.vcf = VCF(self._vcf_path)
@@ -108,10 +129,9 @@ class VCFClass:
             sample_id_column=self._sample_id_column,
             sample_info=samples,
             vcf_path=self._vcf_path,
-            add_info=False,
         )
 
-    def save_vcf(self, save_path, add_ids=False, var_ids=None):
+    def save_vcf(self, save_path, add_ids=False, var_ids=None, samples=None):
         w = Writer(save_path, self.vcf)
         vars_to_save = var_ids if var_ids is not None else self.var_ids
         for v, id in zip(self.vcf, self.var_ids):
