@@ -90,15 +90,6 @@ class VCFClass:
             split_data[name] = tempclass
         return split_data
 
-    def subset_samples(self, sample_list):
-        subsetted_samples = samples.loc[sample_list]
-        subsetted = VCFClass(
-            sample_id_column=self._sample_id_column,
-            vcf_path=self._vcf_path,
-            sample_info=subsetted_samples,
-        )
-        return subsetted
-
     # TODO: find a way to subset variants, cyvcf apparently cant do it
     """
     def subset_variants(self, variant_list):
