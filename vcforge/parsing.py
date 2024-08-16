@@ -35,7 +35,7 @@ def get_vcf_metadata(cyvcf, add_info=False):
         vars_info = []
         for var in cyvcf:
             vars_metadata.append(get_var_metadata_from_var(var))
-            vars_info.append(get_var_info_from_var())
+            vars_info.append(get_var_info_from_var(var))
         vars_info = pd.DataFrame(vars_info)
         vars_metadata_df = pd.DataFrame(vars_metadata, columns=columns)
         vars_metadata_df = pd.concat([vars_metadata_df, vars_info], axis=1)
