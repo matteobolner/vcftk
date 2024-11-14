@@ -237,7 +237,9 @@ class VCFClass:
         vep_annotations = csq_data.str.split("|", expand=True)
         vep_annotations.columns = csq_info
         vep_annotations = vep_annotations.replace("", np.nan)
-        vep_annotations = vep_annotations.drop_duplicates()
+        vep_annotations = (
+            vep_annotations.reset_index().drop_duplicates().set_index("ID")
+        )
         if add_to_info:
             vep_annotations = self.variants.drop(columns=["CSQ"]).merge(
                 vep_annotations, left_index=True, right_index=True
