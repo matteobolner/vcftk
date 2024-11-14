@@ -181,7 +181,6 @@ class VCFClass:
         return var_stats
 
     def show_genotypes(self):
-/*************  ✨ Codeium Command ⭐  *************/
         """
         Return a DataFrame with the genotypes for each variant over the samples in the instance.
 
@@ -194,7 +193,6 @@ class VCFClass:
         pandas.DataFrame
             DataFrame with the genotypes for each variant over the samples in the instance.
         """
-/******  55aa285f-da56-494a-9cf5-fa54432822e1  *******/
         genotypes = []
         for var in self.vcf:
             genotypes.append([Genotype(i) for i in var.genotypes])
