@@ -25,6 +25,7 @@ class VCFClass:
             self.variants["ID"] = add_variant_ids(self.variants)
         self.variants = self.variants.set_index("ID")
         self.var_ids = list(self.variants.index)
+        self.format_info = self._get_format_info()
         print(
             f"VCF contains {len(self.variants)} variants over {len(self.samples)} samples"
         )
@@ -60,6 +61,26 @@ class VCFClass:
         vcf.set_samples(samples)
         sample_info = sample_info.loc[vcf.samples]
         return sample_info, vcf
+
+    def _get_format_info(self):
+        """
+        Retrieve format information from the VCF file.
+
+        This function extracts all unique format fields from the VCF file, retrieves
+        their header information, and returns it as a DataFrame.
+
+        Returns
+        -------
+        pandas.DataFrame
+            A DataFrame containing the header information for each unique format
+            field in the VCF file.
+        """
+        all_formats = self.variants["FORMAT"].str.split(":").explode().unique()
+        format_info = {}
+        for i in all_formats:
+            format_info[i] = self.vcf.get_header_type(i)
+        format_info = pd.DataFrame(format_info).transpose()
+        return format_info
 
     def split_by_sample_column(self, column: list) -> Dict[str, "VCF"]:
         """
@@ -160,6 +181,20 @@ class VCFClass:
         return var_stats
 
     def show_genotypes(self):
+/*************  ✨ Codeium Command ⭐  *************/
+        """
+        Return a DataFrame with the genotypes for each variant over the samples in the instance.
+
+        The index of the DataFrame is the variant IDs, and the columns are the sample IDs.
+        Each element of the DataFrame is a Genotype object, which can be used to access the genotype,
+        phase, and read depths of the variant in the sample.
+
+        Returns
+        -------
+        pandas.DataFrame
+            DataFrame with the genotypes for each variant over the samples in the instance.
+        """
+/******  55aa285f-da56-494a-9cf5-fa54432822e1  *******/
         genotypes = []
         for var in self.vcf:
             genotypes.append([Genotype(i) for i in var.genotypes])
@@ -203,9 +238,7 @@ class VCFClass:
         csq_data = self.variants["CSQ"].str.split(",").explode()
         vep_annotations = csq_data.str.split("|", expand=True)
         vep_annotations.columns = csq_info
-        vep_annotations = vep_annotations.replace(
-            "", np.nan
-        )  # .drop(columns=["Allele"])
+        vep_annotations = vep_annotations.replace("", np.nan)
         vep_annotations = vep_annotations.drop_duplicates()
         if add_to_info:
             vep_annotations = self.variants.drop(columns=["CSQ"]).merge(
