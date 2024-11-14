@@ -1,3 +1,4 @@
 test_data
 poetry.lock
 vcforge/__pycache__/
+dist/
