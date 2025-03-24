@@ -1,11 +1,11 @@
-# vcforge
-vcforge is a python library for working with VCF files.  
+# vcftk
+vcftk is a python library for working with VCF files.  
 
 It provides a variety of tools and methods for importing, exploring, manipulating and analyzing Variant Call Format (VCF) data.
 
 VCF parsing is handled by the cyvcf2 library (https://github.com/brentp/cyvcf2), which is based on the htslib library (https://github.com/samtools/htslib) written in C, resulting in very fast parsing.
 
-vcforge utilizes pandas for producing tables and statistics.
+vcftk utilizes pandas for producing tables and statistics.
 
 The library is designed for explorative analyses, by linking the information about the samples with the variant data.
 
@@ -25,7 +25,7 @@ The library is designed for explorative analyses, by linking the information abo
 Install with `pip`:
 
 ```shell
-pip install vcforge
+pip install vcftk
 ```
 
 ## Dependencies ##
@@ -34,7 +34,7 @@ pip install vcforge
 * cyvcf2
 
 
-## Why vcforge? ##
+## Why vcftk? ##
 
 I started working on this library for myself, seeing how I found myself increasingly frustrated with the lack of python VCF parsing libraries that would allow me to easily explore VCF files in a readable and workable format, such as pandas DataFrames, and allow me to connect sample-level information with the variants. For example, splitting the variants by sample group is something that allows me to quickly and easily explore variants without having to rely on command-line tools that produce files that need to be examined.
 
@@ -45,7 +45,7 @@ I started working on this library for myself, seeing how I found myself increasi
 
 Import the library and read a VCF with its sample information
 ```shell
-from vcforge import VCFClass
+from vcftk import VCFClass
 
 dataset=VCFClass(vcf_path='variants.vcf.gz', sample_info='samples.tsv',sample_id_column="sample", add_info=True, create_ids_if_none=True, threads=4)
 
