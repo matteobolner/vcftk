@@ -1,18 +1,11 @@
-[tool.poetry]
+[project]
 name = "vcforge"
-version = "0.1.8"
-description = "Python library for working with VCF files"
-authors = ["matteobolner <matteo.bolner2@unibo.it>"]
-license = "MIT"
+version = "0.1.0"
+description = "Add your description here"
 readme = "README.md"
-
-[tool.poetry.dependencies]
-python = "^3.12"
-pandas = "^2.2.2"
-numpy = "^2.0.0"
-cyvcf2 = "^0.31.1"
-
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires-python = ">=3.12"
+dependencies = [
+    "cyvcf2>=0.31.1",
+    "numpy>=2.2.4",
+    "pandas>=2.2.3",
+]
