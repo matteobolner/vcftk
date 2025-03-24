@@ -1,4 +1,5 @@
 test_data
 poetry.lock
-vcforge/__pycache__/
+vcftk/__pycache__/
 dist/
+vcftk/test.py

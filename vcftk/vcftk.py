@@ -1,6 +1,6 @@
 import pandas as pd
-from vcforge.parsing import *
-from vcforge.utils import *
+from vcftk.parsing import *
+from vcftk.utils import *
 from typing import Dict
 from cyvcf2 import VCF, Writer
 
