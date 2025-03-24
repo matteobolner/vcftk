@@ -1,86 +1,139 @@
+from random import sample
 import pandas as pd
-from vcftk.parsing import *
-from vcftk.utils import *
+from vcftk.parsing import get_vcf_metadata, add_variant_ids
+from vcftk.utils import parse_table
 from typing import Dict
 from cyvcf2 import VCF, Writer
+
+
+def set_pandas_display_options() -> None:
+    """Set pandas display options."""
+    # Ref: https://stackoverflow.com/a/52432757/
+    display = pd.options.display
+    display.max_columns = 1000
+    display.max_rows = 10_000
+    display.max_colwidth = 199
+    display.width = 1000
+    # display.precision = 2  # set as needed
+    # display.float_format = lambda x: '{:,.2f}'.format(x)  # set as needed
+
+
+set_pandas_display_options()
+
+
+def get_vcf_format_info(vcf, formats):
+    """
+    Retrieve format information from the VCF file.
+
+    This function extracts all unique format fields from the VCF file, retrieves
+    their header information, and returns it as a DataFrame.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A DataFrame containing the header information for each unique format
+        field in the VCF file.
+    """
+    format_info = {}
+    for i in formats:
+        format_info[i] = vcf.get_header_type(i)
+    format_info = pd.DataFrame(format_info).transpose()
+    return format_info
+
+
+def setup_samples_and_vcf(input_sample_info, input_vcf, sample_id_column):
+    """
+    Setup the class with samples, and raw vcf dataframe.
+
+    This function loads the data and sets up the class instance.
+    Parameters:
+        samples (DataFrame or str): DataFrame or path of file containing sample metadata.
+        vcf (DataFrame or str): DataFrame or path of file with the vcf raw data.
+
+    Raises:
+        ValueError: If the sample ID column is not found in the data.
+    """
+    parsed_samples = parse_table(input_sample_info)
+    sample_info = parsed_samples
+    if sample_info is None:
+        raise ValueError("Sample metadata is not properly initialized.")
+    if sample_info.index.name == sample_id_column:
+        sample_info = sample_info.reset_index()
+    if sample_info[sample_id_column].duplicated().any():
+        raise ValueError(
+            "Warning: there are duplicate values in the chosen sample column."
+        )
+    sample_info[sample_id_column] = sample_info[sample_id_column].astype(str)
+    sample_info.set_index(sample_id_column, inplace=True)
+    vcf = VCF(input_vcf)
+    samples = [i for i in sample_info.index if i in vcf.samples]
+    vcf.set_samples(samples)
+    sample_info = sample_info.loc[vcf.samples]
+    return sample_info, vcf
+
+
+def setup(
+    vcf_path,
+    sample_info,
+    sample_id_column="sample",
+    threads=1,
+    create_ids_if_none=True,
+    add_info=False,
+):
+    sample_info, vcf = setup_samples_and_vcf(sample_info, vcf_path, sample_id_column)
+    vcf.set_threads(threads)
+    variants = get_vcf_metadata(VCF(vcf_path), add_info)
+    if create_ids_if_none:
+        variants["ID"] = add_variant_ids(variants)
+    variants = variants.set_index("ID")
+    var_ids = list(variants.index)
+    format_info = get_vcf_format_info(
+        vcf=vcf, formats=variants["FORMAT"].str.split(":").explode().unique()
+    )
+    return VCFClass(
+        sample_id_column=sample_id_column,
+        vcf=vcf,
+        vcf_path=vcf_path,
+        sample_info=sample_info,
+        samples=vcf.samples,
+        threads=threads,
+        variants=variants,
+        var_ids=var_ids,
+        format_info=format_info,
+        create_ids_if_none=create_ids_if_none,
+        add_info=add_info,
+    )
 
 
 class VCFClass:
     def __init__(
         self,
+        vcf,
+        vcf_path,
+        sample_info,
         sample_id_column="sample",
-        vcf_path=None,
-        sample_info=None,
-        add_info=False,
-        create_ids_if_none=True,
+        samples=[],
         threads=1,
+        variants=pd.DataFrame(),
+        var_ids=[],
+        format_info=pd.DataFrame(),
+        create_ids_if_none=False,
+        add_info=False,
     ):
+        self.vcf = vcf
         self._vcf_path = vcf_path
         self._sample_id_column = sample_id_column
-        self.sample_info, self.vcf = self._setup_data(sample_info, vcf_path)
-        self.vcf.set_threads(threads)
-        self.samples = self.vcf.samples
-        self.variants = get_vcf_metadata(VCF(vcf_path), add_info=add_info)
-        if create_ids_if_none:
-            self.variants["ID"] = add_variant_ids(self.variants)
-        self.variants = self.variants.set_index("ID")
-        self.var_ids = list(self.variants.index)
-        self.format_info = self._get_format_info()
+        self._threads = threads
+        self.variants = variants
+        self.var_ids = []
+        self.format_info = format_info
+        self.sample_info = sample_info
+        self.samples = samples
+        self._created_ids = create_ids_if_none
+        self._added_info = add_info
         print(
             f"VCF contains {len(self.variants)} variants over {len(self.samples)} samples"
         )
-
-    def _setup_data(self, input_sample_info, input_vcf) -> None:
-        """
-        Setup the class with samples, and raw vcf dataframe.
-
-        This function loads the data and sets up the class instance.
-        Parameters:
-            samples (DataFrame or str): DataFrame or path of file containing sample metadata.
-            vcf (DataFrame or str): DataFrame or path of file with the vcf raw data.
-
-        Raises:
-            ValueError: If the sample ID column is not found in the data.
-        """
-        parsed_samples = parse_table(input_sample_info)
-        sample_info = parsed_samples
-        if sample_info is None:
-            raise ValueError("Sample metadata is not properly initialized.")
-        if sample_info.index.name == self._sample_id_column:
-            sample_info = sample_info.reset_index()
-        if sample_info[self._sample_id_column].duplicated().any():
-            raise ValueError(
-                "Warning: there are duplicate values in the chosen sample column."
-            )
-        sample_info[self._sample_id_column] = sample_info[
-            self._sample_id_column
-        ].astype(str)
-        sample_info.set_index(self._sample_id_column, inplace=True)
-        vcf = VCF(input_vcf)
-        samples = [i for i in sample_info.index if i in vcf.samples]
-        vcf.set_samples(samples)
-        sample_info = sample_info.loc[vcf.samples]
-        return sample_info, vcf
-
-    def _get_format_info(self):
-        """
-        Retrieve format information from the VCF file.
-
-        This function extracts all unique format fields from the VCF file, retrieves
-        their header information, and returns it as a DataFrame.
-
-        Returns
-        -------
-        pandas.DataFrame
-            A DataFrame containing the header information for each unique format
-            field in the VCF file.
-        """
-        all_formats = self.variants["FORMAT"].str.split(":").explode().unique()
-        format_info = {}
-        for i in all_formats:
-            format_info[i] = self.vcf.get_header_type(i)
-        format_info = pd.DataFrame(format_info).transpose()
-        return format_info
 
     def split_by_sample_column(self, column: list) -> Dict[str, "VCF"]:
         """
@@ -104,10 +157,13 @@ class VCFClass:
         split_data: Dict[str, VCFClass] = {}
         for name, group in self.sample_info.groupby(by=column):
             print(name)
-            tempclass = VCFClass(
-                sample_id_column=self._sample_id_column,
+            tempclass = setup(
                 vcf_path=self._vcf_path,
                 sample_info=group,
+                sample_id_column=self._sample_id_column,
+                threads=self._threads,
+                create_ids_if_none=self._created_ids,
+                add_info=self._added_info,
             )
             split_data[name] = tempclass
         return split_data
