@@ -1,4 +1,3 @@
-from random import sample
 import pandas as pd
 from vcftk.parsing import get_vcf_metadata, add_variant_ids
 from vcftk.utils import parse_table
