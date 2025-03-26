@@ -1,5 +1,11 @@
 import pandas as pd
-from vcftk.parsing import get_vcf_metadata, add_variant_ids
+from vcftk.parsing import (
+    build_var_ID,
+    get_variants_metadata,
+    get_variants_info,
+    get_var_format_from_vcf,
+    setup_samples_and_vcf,
+)
 from vcftk.utils import parse_table
 from typing import Dict
 from cyvcf2 import VCF, Writer
@@ -40,48 +46,23 @@ def get_vcf_format_info(vcf, formats):
     return format_info
 
 
-def setup_samples_and_vcf(input_sample_info, input_vcf, sample_id_column):
-    """
-    Setup the class with samples, and raw vcf dataframe.
-
-    This function loads the data and sets up the class instance.
-    Parameters:
-        samples (DataFrame or str): DataFrame or path of file containing sample metadata.
-        vcf (DataFrame or str): DataFrame or path of file with the vcf raw data.
-
-    Raises:
-        ValueError: If the sample ID column is not found in the data.
-    """
-    parsed_samples = parse_table(input_sample_info)
-    sample_info = parsed_samples
-    if sample_info is None:
-        raise ValueError("Sample metadata is not properly initialized.")
-    if sample_info.index.name == sample_id_column:
-        sample_info = sample_info.reset_index()
-    if sample_info[sample_id_column].duplicated().any():
-        raise ValueError(
-            "Warning: there are duplicate values in the chosen sample column."
-        )
-    sample_info[sample_id_column] = sample_info[sample_id_column].astype(str)
-    sample_info.set_index(sample_id_column, inplace=True)
-    vcf = VCF(input_vcf)
-    samples = [i for i in sample_info.index if i in vcf.samples]
-    vcf.set_samples(samples)
-    sample_info = sample_info.loc[vcf.samples]
-    return sample_info, vcf
-
-
 def setup(
     vcf_path,
-    sample_info,
+    sample_info=None,
     sample_id_column="sample",
     threads=1,
-    create_ids_if_none=True,
-    add_info=False,
+    # create_ids_if_none=True,
+    # add_info=False,
 ):
-    sample_info, vcf = setup_samples_and_vcf(sample_info, vcf_path, sample_id_column)
+    sample_info, vcf = setup_samples_and_vcf(
+        input_vcf=vcf_path,
+        input_sample_info=sample_info,
+        sample_id_column=sample_id_column,
+    )
     vcf.set_threads(threads)
+    """
     variants = get_vcf_metadata(VCF(vcf_path), add_info)
+
     if create_ids_if_none:
         variants["ID"] = add_variant_ids(variants)
     variants = variants.set_index("ID")
@@ -89,6 +70,7 @@ def setup(
     format_info = get_vcf_format_info(
         vcf=vcf, formats=variants["FORMAT"].str.split(":").explode().unique()
     )
+    """
     return VCFClass(
         sample_id_column=sample_id_column,
         vcf=vcf,
@@ -96,11 +78,11 @@ def setup(
         sample_info=sample_info,
         samples=vcf.samples,
         threads=threads,
-        variants=variants,
-        var_ids=var_ids,
-        format_info=format_info,
-        create_ids_if_none=create_ids_if_none,
-        add_info=add_info,
+        # variants=variants,
+        # var_ids=var_ids,
+        # format_info=format_info,
+        # create_ids_if_none=create_ids_if_none,
+        # add_info=add_info,
     )
 
 
@@ -113,28 +95,72 @@ class VCFClass:
         sample_id_column="sample",
         samples=[],
         threads=1,
-        variants=pd.DataFrame(),
-        var_ids=[],
-        format_info=pd.DataFrame(),
-        create_ids_if_none=False,
-        add_info=False,
+        # variants=pd.DataFrame(),
+        # var_ids=[],
+        # format_info=pd.DataFrame(),
+        # create_ids_if_none=False,
+        # add_info=False,
     ):
         self.vcf = vcf
         self._vcf_path = vcf_path
         self._sample_id_column = sample_id_column
         self._threads = threads
-        self.variants = variants
-        self.var_ids = []
-        self.format_info = format_info
+        # self.variants = variants
+        # self.var_ids = []
+        # self.format_info = format_info
         self.sample_info = sample_info
         self.samples = samples
-        self._created_ids = create_ids_if_none
-        self._added_info = add_info
-        print(
-            f"VCF contains {len(self.variants)} variants over {len(self.samples)} samples"
-        )
+        # self._created_ids = create_ids_if_none
+        # self._added_info = add_info
+        # print(
+        #    f"VCF contains {self.vcf.num_records} variants over {len(self.samples)} samples"
+        # )
 
-    def split_by_sample_column(self, column: list) -> Dict[str, "VCF"]:
+    def create_IDs(self, alleles=False):
+        ids = build_var_ID(self._variants_, alleles)
+        self._variants_["ID"] = ids
+        self._variants_.set_index("ID", drop=True, inplace=True)
+        return ids
+
+    @property
+    def variants(self):
+        """Lazy initialization of variant metadata."""
+        if not hasattr(self, "_variants_"):
+            var_metadata = get_variants_metadata(self.vcf)
+            if var_metadata["ID"].duplicated().any():
+                Warning(
+                    "There are duplicate / empty variant IDs - you must create unique IDs before proceeding, or problems will arise"
+                )
+            self._variants_ = var_metadata.set_index("ID", drop=False)
+        self.reset_vcf_iterator()
+        return self._variants_
+
+    @property
+    def var_ids(self):
+        self._var_ids_ = list(self._variants_.index)
+        return self._var_ids_
+
+    @property
+    def var_info(self):
+        """Lazy initialization of variant info fields."""
+        if not hasattr(self, "_var_info_"):
+            var_info = get_variants_info(self.vcf)
+            var_info["ID"] = self.var_ids
+            if var_info["ID"].duplicated().any():
+                Warning(
+                    "There are duplicate / empty variant IDs - you must create unique IDs before proceeding, or problems will arise"
+                )
+            self._var_info_ = var_info.set_index("ID", drop=False)
+        self.reset_vcf_iterator()
+        return self._var_info_
+
+    def split(self, by="samples", columns=[]):
+        if by == "samples":
+            return self._split_by_samples(columns=columns)
+        elif by == "variants":
+            raise ValueError("Not yet implemented...")
+
+    def _split_by_samples(self, columns) -> Dict[str, "VCF"]:
         """
         Split the dataset (data and sample metadata) in multiple independent VCF instances
         based on the values of one or more sample metadata columns.
@@ -154,18 +180,31 @@ class VCFClass:
             containing the split data.
         """
         split_data: Dict[str, VCFClass] = {}
-        for name, group in self.sample_info.groupby(by=column):
+        for name, group in self.sample_info.groupby(by=columns):
             print(name)
             tempclass = setup(
                 vcf_path=self._vcf_path,
                 sample_info=group,
                 sample_id_column=self._sample_id_column,
                 threads=self._threads,
-                create_ids_if_none=self._created_ids,
-                add_info=self._added_info,
             )
             split_data[name] = tempclass
         return split_data
+
+    def subset(self, what="samples", ids=[]):
+        if what == "samples":
+            return self._subset_samples(ids)
+        elif what == "variants":
+            raise ValueError("Not implemented yet...")
+
+    def _subset_samples(self, ids):
+        samples = self.sample_info.loc[ids]
+        return setup(
+            vcf_path=self._vcf_path,
+            sample_info=samples,
+            sample_id_column=self._sample_id_column,
+            threads=self._threads,
+        )
 
     # TODO: find a way to subset variants, cyvcf apparently cant do it
     """
@@ -189,15 +228,6 @@ class VCFClass:
         vars_format = get_var_format_from_vcf(self.vcf, format, allele)
         self.reset_vcf_iterator()
         return vars_format
-
-    def subset_samples(self, samples):
-        samples = self.sample_info.loc[samples]
-        print(samples)
-        return VCFClass(
-            sample_id_column=self._sample_id_column,
-            sample_info=samples,
-            vcf_path=self._vcf_path,
-        )
 
     def save_vcf(self, save_path, add_ids=False, var_ids=None, samples=None):
         w = Writer(save_path, self.vcf)
