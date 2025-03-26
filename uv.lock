@@ -186,7 +186,7 @@ wheels = [
 ]
 
 [[package]]
-name = "vcforge"
+name = "vcftk"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

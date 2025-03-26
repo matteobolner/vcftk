@@ -1,9 +1,52 @@
 from numpy._core.fromnumeric import var
 import pandas as pd
-import gzip
 import numpy as np
 
 from cyvcf2 import VCF
+
+
+def parse_table(input_data):
+    """
+    Parse input data as pandas dataframe or as file path to TSV or CSV file
+
+    This function allows users to provide input data as a pandas DataFrame or
+    as a file path to a TSV or CSV file. If the input is a DataFrame, it is
+    returned as is. If the input is a file path, the function loads the data
+    from the file and returns it as a DataFrame.
+
+    Parameters
+    ----------
+    input_data : pandas.DataFrame or str
+        Input data to be parsed.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Input data as a pandas DataFrame.
+
+    Raises
+    ------
+    TypeError
+        If the input is not a pandas DataFrame or a file path.
+    """
+    if isinstance(input_data, pd.DataFrame):
+        # data = input_data.reset_index(drop=False)
+        return input_data
+    elif isinstance(input_data, str):
+        if input_data.endswith((".tsv", ".csv")):
+            if input_data.endswith(".tsv"):
+                data = pd.read_table(input_data, sep="\t").reset_index(drop=True)
+            elif input_data.endswith(".csv"):
+                data = pd.read_csv(input_data).reset_index(drop=True)
+            return data
+        else:
+            raise TypeError(
+                "Input should be a Pandas DataFrame or a file path to a TSV or CSV file."
+            )
+    else:
+        raise TypeError(
+            "Input should be a Pandas DataFrame or a file path to a TSV or CSV file."
+        )
 
 
 def get_cyvcf(vcf_path):
@@ -71,6 +114,32 @@ def get_variants_info(cyvcf):
     vars_info = [get_var_info_from_var(var) for var in cyvcf]
     vars_info = pd.DataFrame(vars_info)
     return vars_info
+
+
+def get_var_stats_from_var(var):
+    var_stats = [
+        var.num_called,
+        var.call_rate,
+        var.aaf,
+        var.nucl_diversity,
+        var.var_type,
+        var.var_subtype,
+    ]
+    return var_stats
+
+
+def get_variants_stats(cyvcf):
+    columns = [
+        "NUM_CALLED",
+        "CALL_RATE",
+        "AA_FREQ",
+        "NUCL_DIVERSITY",
+        "VAR_TYPE",
+        "VAR_SUBTYPE",
+    ]
+    var_stats = [get_var_stats_from_var(var) for var in cyvcf]
+    var_stats_df = pd.DataFrame(var_stats, columns=columns)
+    return var_stats_df
 
 
 def add_variant_ids(vars_metadata):

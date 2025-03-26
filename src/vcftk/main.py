@@ -5,8 +5,8 @@ from vcftk.parsing import (
     get_variants_info,
     get_var_format_from_vcf,
     setup_samples_and_vcf,
+    get_variants_stats,
 )
-from vcftk.utils import parse_table
 from typing import Dict
 from cyvcf2 import VCF, Writer
 
@@ -137,15 +137,20 @@ class VCFClass:
 
     @property
     def var_ids(self):
+        if not hasattr(self, "_variants_"):
+            _ = self.variants
         self._var_ids_ = list(self._variants_.index)
+        self.reset_vcf_iterator()
         return self._var_ids_
 
     @property
     def var_info(self):
         """Lazy initialization of variant info fields."""
         if not hasattr(self, "_var_info_"):
+            if not hasattr(self, "_var_ids_"):
+                _ = self.var_ids
             var_info = get_variants_info(self.vcf)
-            var_info["ID"] = self.var_ids
+            var_info["ID"] = self._var_ids_
             if var_info["ID"].duplicated().any():
                 Warning(
                     "There are duplicate / empty variant IDs - you must create unique IDs before proceeding, or problems will arise"
@@ -153,6 +158,22 @@ class VCFClass:
             self._var_info_ = var_info.set_index("ID", drop=False)
         self.reset_vcf_iterator()
         return self._var_info_
+
+    @property
+    def var_stats(self):
+        """Lazy initialization of variant stats."""
+        if not hasattr(self, "_var_stats_"):
+            if not hasattr(self, "_var_ids_"):
+                _ = self.var_ids
+            var_stats = get_variants_stats(self.vcf)
+            var_stats["ID"] = self._var_ids_
+            if var_stats["ID"].duplicated().any():
+                Warning(
+                    "There are duplicate / empty variant IDs - you must create unique IDs before proceeding, or problems will arise"
+                )
+            self._var_stats_ = var_stats.set_index("ID", drop=False)
+        self.reset_vcf_iterator()
+        return self._var_stats_
 
     def split(self, by="samples", columns=[]):
         if by == "samples":
@@ -208,7 +229,7 @@ class VCFClass:
 
     # TODO: find a way to subset variants, cyvcf apparently cant do it
     """
-    def subset_variants(self, variant_list):
+    def _subset_variants(self, variant_list):
         subsetted_variants=self.variants.loc[variant_list]
         subsetted = VCFClass(
             sample_id_column=self._sample_id_column,
@@ -229,7 +250,7 @@ class VCFClass:
         self.reset_vcf_iterator()
         return vars_format
 
-    def save_vcf(self, save_path, add_ids=False, var_ids=None, samples=None):
+    def save_vcf(self, save_path, add_ids=False, var_ids=None):
         w = Writer(save_path, self.vcf)
         vars_to_save = var_ids if var_ids is not None else self.var_ids
         for v, id in zip(self.vcf, self.var_ids):
@@ -243,29 +264,7 @@ class VCFClass:
         self.reset_vcf_iterator()
         print(f"VCF saved to {save_path}")
 
-    def get_var_stats(self, add_to_info=True):
-        var_stats = {
-            "NUM_CALLED": {},
-            "CALL_RATE": {},
-            "AA_FREQ": {},
-            "NUCL_DIVERSITY": {},
-            "VAR_TYPE": {},
-            "VAR_SUBTYPE": {},
-        }
-        for var, id in zip(self.vcf, self.var_ids):
-            var_stats["NUM_CALLED"][id] = var.num_called
-            var_stats["CALL_RATE"][id] = var.call_rate
-            var_stats["AA_FREQ"][id] = var.aaf
-            var_stats["NUCL_DIVERSITY"][id] = var.nucl_diversity
-            var_stats["VAR_TYPE"][id] = var.var_type
-            var_stats["VAR_SUBTYPE"][id] = var.var_subtype
-        var_stats = pd.DataFrame(var_stats)
-        if add_to_info is True:
-            self.variants = pd.concat([self.variants, var_stats], axis=1)
-        self.reset_vcf_iterator()
-        return var_stats
-
-    def show_genotypes(self):
+    def genotypes(self):
         """
         Return a DataFrame with the genotypes for each variant over the samples in the instance.
 
@@ -278,10 +277,17 @@ class VCFClass:
         pandas.DataFrame
             DataFrame with the genotypes for each variant over the samples in the instance.
         """
-        genotypes = []
-        for var in self.vcf:
-            genotypes.append([Genotype(i) for i in var.genotypes])
-        genotypes = pd.DataFrame(genotypes, index=self.var_ids, columns=self.samples)
+        if not hasattr(self, "_var_ids_"):
+            _ = self.var_ids
+        allgts = [i.genotypes for i in self.vcf]
+
+        def genotype_string(gt):
+            sep = "/|"[int(gt[2])]
+            gt_string = f"{gt[0]}{sep}{gt[1]}"
+            return gt_string
+
+        gts = [[genotype_string(gt) for gt in i] for i in allgts]
+        genotypes = pd.DataFrame(gts, index=self.var_ids, columns=self.samples)
         self.reset_vcf_iterator()
         return genotypes
 
