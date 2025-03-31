@@ -3,3 +3,6 @@ poetry.lock
 vcftk/__pycache__/
 dist/
 vcftk/test.py
+src/vcftk.egg-info
+src/vcftk/__pycache__/
+src/vcftk/test.py

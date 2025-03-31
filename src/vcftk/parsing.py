@@ -53,6 +53,26 @@ def get_cyvcf(vcf_path):
     return VCF(vcf_path)
 
 
+def get_vcf_format_info(vcf, formats):
+    """
+    Retrieve format information from the VCF file.
+
+    This function extracts all unique format fields from the VCF file, retrieves
+    their header information, and returns it as a DataFrame.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A DataFrame containing the header information for each unique format
+        field in the VCF file.
+    """
+    format_info = {}
+    for i in formats:
+        format_info[i] = vcf.get_header_type(i)
+    format_info = pd.DataFrame(format_info).transpose()
+    return format_info
+
+
 def get_var_info_from_var(var):
     return {k: v for k, v in var.INFO}
 
@@ -180,7 +200,7 @@ def get_var_format_from_vcf(cyvcf, format, allele):
 
 
 def build_var_ID(df, alleles=False):
-    if alleles == True:
+    if alleles:
         ids = (
             df["CHROM"].astype(str)
             + ":"

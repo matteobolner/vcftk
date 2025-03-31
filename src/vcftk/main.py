@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from vcftk.parsing import (
     build_var_ID,
@@ -24,26 +25,6 @@ def set_pandas_display_options() -> None:
 
 
 set_pandas_display_options()
-
-
-def get_vcf_format_info(vcf, formats):
-    """
-    Retrieve format information from the VCF file.
-
-    This function extracts all unique format fields from the VCF file, retrieves
-    their header information, and returns it as a DataFrame.
-
-    Returns
-    -------
-    pandas.DataFrame
-        A DataFrame containing the header information for each unique format
-        field in the VCF file.
-    """
-    format_info = {}
-    for i in formats:
-        format_info[i] = vcf.get_header_type(i)
-    format_info = pd.DataFrame(format_info).transpose()
-    return format_info
 
 
 def setup(
@@ -159,21 +140,17 @@ class VCFClass:
         self.reset_vcf_iterator()
         return self._var_info_
 
-    @property
     def var_stats(self):
-        """Lazy initialization of variant stats."""
-        if not hasattr(self, "_var_stats_"):
-            if not hasattr(self, "_var_ids_"):
-                _ = self.var_ids
-            var_stats = get_variants_stats(self.vcf)
-            var_stats["ID"] = self._var_ids_
-            if var_stats["ID"].duplicated().any():
-                Warning(
-                    "There are duplicate / empty variant IDs - you must create unique IDs before proceeding, or problems will arise"
-                )
-            self._var_stats_ = var_stats.set_index("ID", drop=False)
+        if not hasattr(self, "_var_ids_"):
+            _ = self.var_ids
+        var_stats = get_variants_stats(self.vcf)
+        var_stats["ID"] = self._var_ids_
+        if var_stats["ID"].duplicated().any():
+            Warning(
+                "There are duplicate / empty variant IDs - you must create unique IDs before proceeding, or problems will arise"
+            )
         self.reset_vcf_iterator()
-        return self._var_stats_
+        return var_stats
 
     def split(self, by="samples", columns=[]):
         if by == "samples":
@@ -264,7 +241,7 @@ class VCFClass:
         self.reset_vcf_iterator()
         print(f"VCF saved to {save_path}")
 
-    def genotypes(self):
+    def display_genotypes(self):
         """
         Return a DataFrame with the genotypes for each variant over the samples in the instance.
 
@@ -279,17 +256,40 @@ class VCFClass:
         """
         if not hasattr(self, "_var_ids_"):
             _ = self.var_ids
-        allgts = [i.genotypes for i in self.vcf]
-
-        def genotype_string(gt):
-            sep = "/|"[int(gt[2])]
-            gt_string = f"{gt[0]}{sep}{gt[1]}"
-            return gt_string
-
+        allgts = [var.genotypes for var in self.vcf]
         gts = [[genotype_string(gt) for gt in i] for i in allgts]
         genotypes = pd.DataFrame(gts, index=self.var_ids, columns=self.samples)
         self.reset_vcf_iterator()
         return genotypes
+
+    def get_genotypes(self, phasing_status=False):
+        if not phasing_status:
+            genotypes = pd.DataFrame(
+                [[gt[:2] for gt in var.genotypes] for var in self.vcf]
+            )
+        else:
+            genotypes = pd.DataFrame([[gt for gt in var.genotypes] for var in self.vcf])
+        self.reset_vcf_iterator()
+        genotypes.index = self.var_ids
+        genotypes.columns = self.samples
+        return genotypes
+
+    def allele_frequency(self, var_ids="all", allele=1):
+        genotypes = self.get_genotypes(phasing_status=False).transpose()
+        if var_ids != "all":
+            genotypes = genotypes.loc[var_ids]
+        return compute_all_allele_frequencies(all_vars_gts=genotypes, allele=allele)
+
+    def grouped_allele_frequency(self, var_ids="all", allele=1, groupcols=[]):
+        genotypes = self.get_genotypes(phasing_status=False).transpose()
+        if var_ids != "all":
+            genotypes = genotypes[var_ids]
+        genotypes = self.sample_info.merge(genotypes, left_index=True, right_index=True)
+        afs = genotypes.groupby(by=groupcols).apply(
+            compute_all_allele_frequencies, allele=allele
+        )
+        afs = afs.drop(columns=self.sample_info.columns).transpose()
+        return afs
 
     def extract_vep_annotations(self, add_to_info=False):
         """
@@ -351,3 +351,31 @@ class Genotype(object):
         return sep.join("0123."[a] for a in self.alleles)
 
     __repr__ = __str__
+
+
+def genotype_string(gt):
+    sep = "/|"[int(gt[2])]
+    gt_string = f"{gt[0]}{sep}{gt[1]}"
+    return gt_string
+
+
+def genotype_array(genotype_series):
+    return np.array(genotype_series.values.tolist())
+
+
+def compute_allele_frequency(var_gts, allele=1):
+    ref_counts = np.sum(var_gts == 0)
+    allele_counts = np.sum(var_gts == allele)
+    if ref_counts == 0 and allele_counts == 0:
+        return np.nan
+    return allele_counts / (ref_counts + allele_counts)
+
+
+def compute_all_allele_frequencies(all_vars_gts: pd.DataFrame, allele: int):
+    afs = all_vars_gts.apply(
+        lambda var_gts: compute_allele_frequency(
+            genotype_array(var_gts), allele=allele
+        ),
+        axis=0,
+    )
+    return afs
