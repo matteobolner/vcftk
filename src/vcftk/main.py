@@ -32,7 +32,7 @@ def setup(
     sample_info=None,
     sample_id_column="sample",
     threads=1,
-    # create_ids_if_none=True,
+    build_ids=True,
     # add_info=False,
 ):
     sample_info, vcf = setup_samples_and_vcf(
