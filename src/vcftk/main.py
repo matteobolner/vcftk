@@ -105,12 +105,6 @@ class VCFClass:
         #    f"VCF contains {self.vcf.num_records} variants over {len(self.samples)} samples"
         # )
 
-    def build_var_ids(self):
-        ids = build_var_ID(self._variants_, alleles=self._verbose_ids)
-        self._variants_["ID"] = ids
-        self._variants_.set_index("ID", drop=True, inplace=True)
-        return ids
-
     @property
     def variants(self):
         """Lazy initialization of variant metadata."""
@@ -120,10 +114,13 @@ class VCFClass:
                 Warning(
                     "There are duplicate / empty variant IDs - you must create unique IDs before proceeding, or problems will arise"
                 )
+            self._variants_ = var_metadata
             if self._build_ids:
-                self.build_var_ids()
+                ids = build_var_ID(self._variants_, alleles=self._verbose_ids)
+                self._variants_["ID"] = ids
+                self._variants_.set_index("ID", drop=True, inplace=True)
             else:
-                self._variants_ = var_metadata.set_index("ID", drop=False)
+                self._variants_ = self._variants_.set_index("ID", drop=False)
         self.reset_vcf_iterator()
         return self._variants_
 
