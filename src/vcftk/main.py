@@ -76,7 +76,7 @@ class VCFClass:
         sample_id_column="sample",
         samples=[],
         threads=1,
-        build_ids=False
+        build_ids=False,
         # variants=pd.DataFrame(),
         # var_ids=[],
         # format_info=pd.DataFrame(),
@@ -92,7 +92,7 @@ class VCFClass:
         # self.format_info = format_info
         self.sample_info = sample_info
         self.samples = samples
-        self.build_ids=build_ids
+        self.build_ids = build_ids
         # self._created_ids = create_ids_if_none
         # self._added_info = add_info
         # print(
@@ -124,7 +124,6 @@ class VCFClass:
     def var_ids(self):
         if not hasattr(self, "_variants_"):
             _ = self.variants
-        if self._variants_.index
         self._var_ids_ = list(self._variants_.index)
         self.reset_vcf_iterator()
         return self._var_ids_
