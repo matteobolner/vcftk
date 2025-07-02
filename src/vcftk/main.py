@@ -337,7 +337,7 @@ def compute_all_allele_frequencies(all_vars_gts: pd.DataFrame, allele: int):
     return afs
 
 
-def extract_vep_annotations(VCFClass, add_to_info=False, canonican_only=True):
+def extract_vep_annotations(vcf_class)
     """
     Extract VEP annotations from the VCF file.
     This function explodes the "CSQ" column, which contains the VEP annotations, and
@@ -359,25 +359,20 @@ def extract_vep_annotations(VCFClass, add_to_info=False, canonican_only=True):
     ValueError
         If the "CSQ" column is not found in the variants DataFrame.
     """
-    if "CSQ" not in VCFClass.variants.columns:
+    if "CSQ" not in vcf_class.var_info.columns:
         raise ValueError(
             "CSQ column not found in variants. This column is required for VEP annotations. Consider parsing VCF with add_info=True"
         )
 
     csq_info = (
-        self.vcf.get_header_type("CSQ")["Description"]
+        vcf_class.vcf.get_header_type("CSQ")["Description"]
         .split(" ")[6]
         .strip('"')
         .split("|")
     )
-    csq_data = self.variants["CSQ"].str.split(",").explode()
+    csq_data = vcf_class.var_info["CSQ"].str.split(",").explode()
     vep_annotations = csq_data.str.split("|", expand=True)
     vep_annotations.columns = csq_info
     vep_annotations = vep_annotations.replace("", np.nan)
     vep_annotations = vep_annotations.reset_index().drop_duplicates().set_index("ID")
-    if add_to_info:
-        vep_annotations = self.variants.drop(columns=["CSQ"]).merge(
-            vep_annotations, left_index=True, right_index=True
-        )
-
     return vep_annotations
