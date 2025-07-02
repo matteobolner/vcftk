@@ -337,7 +337,7 @@ def compute_all_allele_frequencies(all_vars_gts: pd.DataFrame, allele: int):
     return afs
 
 
-def extract_vep_annotations(vcf_class)
+def extract_vep_annotations(vcf_class):
     """
     Extract VEP annotations from the VCF file.
     This function explodes the "CSQ" column, which contains the VEP annotations, and
