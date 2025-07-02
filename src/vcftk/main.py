@@ -32,7 +32,8 @@ def setup(
     sample_info=None,
     sample_id_column="sample",
     threads=1,
-    build_ids=True,
+    build_ids=False,
+    verbose_ids=True,
     # add_info=False,
 ):
     sample_info, vcf = setup_samples_and_vcf(
@@ -59,6 +60,8 @@ def setup(
         sample_info=sample_info,
         samples=vcf.samples,
         threads=threads,
+        build_ids=build_ids,
+        verbose_ids=verbose_ids,
         # variants=variants,
         # var_ids=var_ids,
         # format_info=format_info,
