@@ -76,6 +76,7 @@ class VCFClass:
         sample_id_column="sample",
         samples=[],
         threads=1,
+        build_ids=False
         # variants=pd.DataFrame(),
         # var_ids=[],
         # format_info=pd.DataFrame(),
@@ -91,6 +92,7 @@ class VCFClass:
         # self.format_info = format_info
         self.sample_info = sample_info
         self.samples = samples
+        self.build_ids=build_ids
         # self._created_ids = create_ids_if_none
         # self._added_info = add_info
         # print(
@@ -113,6 +115,8 @@ class VCFClass:
                     "There are duplicate / empty variant IDs - you must create unique IDs before proceeding, or problems will arise"
                 )
             self._variants_ = var_metadata.set_index("ID", drop=False)
+            if self.build_ids:
+                self.create_IDs()
         self.reset_vcf_iterator()
         return self._variants_
 
@@ -120,6 +124,7 @@ class VCFClass:
     def var_ids(self):
         if not hasattr(self, "_variants_"):
             _ = self.variants
+        if self._variants_.index
         self._var_ids_ = list(self._variants_.index)
         self.reset_vcf_iterator()
         return self._var_ids_
@@ -291,53 +296,6 @@ class VCFClass:
         afs = afs.drop(columns=self.sample_info.columns).transpose()
         return afs
 
-    def extract_vep_annotations(self, add_to_info=False):
-        """
-        Extract VEP annotations from the VCF file.
-        This function explodes the "CSQ" column, which contains the VEP annotations, and
-        creates a new DataFrame with one row per variant per transcript. The resulting
-        DataFrame contains the VEP annotations for each variant, with the column names
-        as described in the VCF header. If add_to_info is True, the variant info dataframe
-        will be merged with the annotations. Keep in mind that there are likely multiple
-        annotations per variant, therefore the resulting dataframe will have multiple rows
-        per variant ID.
-
-        Returns
-        -------
-        pandas.DataFrame
-            A DataFrame containing the VEP annotations for each variant. If add_to_info
-            is True, the variant info dataframe will be merged with the annotations.
-
-        Raises
-        ------
-        ValueError
-            If the "CSQ" column is not found in the variants DataFrame.
-        """
-        if "CSQ" not in self.variants.columns:
-            raise ValueError(
-                "CSQ column not found in variants. This column is required for VEP annotations. Consider parsing VCF with add_info=True"
-            )
-
-        csq_info = (
-            self.vcf.get_header_type("CSQ")["Description"]
-            .split(" ")[6]
-            .strip('"')
-            .split("|")
-        )
-        csq_data = self.variants["CSQ"].str.split(",").explode()
-        vep_annotations = csq_data.str.split("|", expand=True)
-        vep_annotations.columns = csq_info
-        vep_annotations = vep_annotations.replace("", np.nan)
-        vep_annotations = (
-            vep_annotations.reset_index().drop_duplicates().set_index("ID")
-        )
-        if add_to_info:
-            vep_annotations = self.variants.drop(columns=["CSQ"]).merge(
-                vep_annotations, left_index=True, right_index=True
-            )
-
-        return vep_annotations
-
 
 class Genotype(object):
     __slots__ = ("alleles", "phased")
@@ -379,3 +337,49 @@ def compute_all_allele_frequencies(all_vars_gts: pd.DataFrame, allele: int):
         axis=0,
     )
     return afs
+
+
+def extract_vep_annotations(VCFClass, add_to_info=False, canonican_only=True):
+    """
+    Extract VEP annotations from the VCF file.
+    This function explodes the "CSQ" column, which contains the VEP annotations, and
+    creates a new DataFrame with one row per variant per transcript. The resulting
+    DataFrame contains the VEP annotations for each variant, with the column names
+    as described in the VCF header. If add_to_info is True, the variant info dataframe
+    will be merged with the annotations. Keep in mind that there are likely multiple
+    annotations per variant, therefore the resulting dataframe will have multiple rows
+    per variant ID.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A DataFrame containing the VEP annotations for each variant. If add_to_info
+        is True, the variant info dataframe will be merged with the annotations.
+
+    Raises
+    ------
+    ValueError
+        If the "CSQ" column is not found in the variants DataFrame.
+    """
+    if "CSQ" not in VCFClass.variants.columns:
+        raise ValueError(
+            "CSQ column not found in variants. This column is required for VEP annotations. Consider parsing VCF with add_info=True"
+        )
+
+    csq_info = (
+        self.vcf.get_header_type("CSQ")["Description"]
+        .split(" ")[6]
+        .strip('"')
+        .split("|")
+    )
+    csq_data = self.variants["CSQ"].str.split(",").explode()
+    vep_annotations = csq_data.str.split("|", expand=True)
+    vep_annotations.columns = csq_info
+    vep_annotations = vep_annotations.replace("", np.nan)
+    vep_annotations = vep_annotations.reset_index().drop_duplicates().set_index("ID")
+    if add_to_info:
+        vep_annotations = self.variants.drop(columns=["CSQ"]).merge(
+            vep_annotations, left_index=True, right_index=True
+        )
+
+    return vep_annotations
