@@ -24,7 +24,7 @@ def set_pandas_display_options() -> None:
     # display.float_format = lambda x: '{:,.2f}'.format(x)  # set as needed
 
 
-set_pandas_display_options()
+# set_pandas_display_options()
 
 
 def setup(
