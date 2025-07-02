@@ -225,6 +225,8 @@ class VCFClass:
 
     def format(self, format, allele):
         vars_format = get_var_format_from_vcf(self.vcf, format, allele)
+        vars_format["ID"] = self.var_ids
+        vars_format = vars_format.set_index("ID")
         self.reset_vcf_iterator()
         return vars_format
 
