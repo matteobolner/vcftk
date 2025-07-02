@@ -140,10 +140,6 @@ class VCFClass:
                 _ = self.var_ids
             var_info = get_variants_info(self.vcf)
             var_info["ID"] = self._var_ids_
-            if var_info["ID"].duplicated().any():
-                Warning(
-                    "There are duplicate / empty variant IDs - you must create unique IDs before proceeding, or problems will arise"
-                )
             self._var_info_ = var_info.set_index("ID", drop=False)
         self.reset_vcf_iterator()
         return self._var_info_
@@ -153,10 +149,7 @@ class VCFClass:
             _ = self.var_ids
         var_stats = get_variants_stats(self.vcf)
         var_stats["ID"] = self._var_ids_
-        if var_stats["ID"].duplicated().any():
-            Warning(
-                "There are duplicate / empty variant IDs - you must create unique IDs before proceeding, or problems will arise"
-            )
+        var_stats = var_stats.set_index("ID")
         self.reset_vcf_iterator()
         return var_stats
 
