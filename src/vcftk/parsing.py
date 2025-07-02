@@ -210,9 +210,10 @@ def build_var_ID(df, alleles=False):
             + "_"
             + df["ALT"].apply(lambda x: ",".join(x) if isinstance(x, list) else x)
         )
+
     else:
         ids = df["CHROM"].astype(str) + ":" + df["POS"].astype(str)
-    return ids
+    return ids.tolist()
 
 
 def build_var_ID_HGVS(var):

@@ -76,7 +76,9 @@ class VCFClass:
         sample_id_column="sample",
         samples=[],
         threads=1,
+        # ID BUILDING
         build_ids=False,
+        verbose_ids=True,
         # variants=pd.DataFrame(),
         # var_ids=[],
         # format_info=pd.DataFrame(),
@@ -92,15 +94,16 @@ class VCFClass:
         # self.format_info = format_info
         self.sample_info = sample_info
         self.samples = samples
-        self.build_ids = build_ids
+        self._build_ids = build_ids
+        self._verbose_ids = verbose_ids
         # self._created_ids = create_ids_if_none
         # self._added_info = add_info
         # print(
         #    f"VCF contains {self.vcf.num_records} variants over {len(self.samples)} samples"
         # )
 
-    def create_IDs(self, alleles=False):
-        ids = build_var_ID(self._variants_, alleles)
+    def build_var_ids(self):
+        ids = build_var_ID(self._variants_, alleles=self._verbose_ids)
         self._variants_["ID"] = ids
         self._variants_.set_index("ID", drop=True, inplace=True)
         return ids
@@ -114,9 +117,10 @@ class VCFClass:
                 Warning(
                     "There are duplicate / empty variant IDs - you must create unique IDs before proceeding, or problems will arise"
                 )
-            self._variants_ = var_metadata.set_index("ID", drop=False)
-            if self.build_ids:
-                self.create_IDs()
+            if self._build_ids:
+                self.build_var_ids()
+            else:
+                self._variants_ = var_metadata.set_index("ID", drop=False)
         self.reset_vcf_iterator()
         return self._variants_
 
